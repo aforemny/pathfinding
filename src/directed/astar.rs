@@ -82,7 +82,7 @@ pub fn astar<N, C, FN, IN, FH, FS>(
     mut successors: FN,
     mut heuristic: FH,
     mut success: FS,
-) -> Option<(Vec<N>, C)>
+) -> Result<(Vec<N>, C), (Vec<N>, C)>
 where
     N: Eq + Hash + Clone,
     C: Zero + Ord + Copy,
@@ -97,6 +97,7 @@ where
         cost: Zero::zero(),
         index: 0,
     });
+    let mut fb = ( 0, heuristic(start), Zero::zero() );
     let mut parents: IndexMap<N, (usize, C)> = IndexMap::new();
     parents.insert(start.clone(), (usize::MAX, Zero::zero()));
     while let Some(SmallestCostHolder { cost, index, .. }) = to_see.pop() {
@@ -104,7 +105,7 @@ where
             let (node, &(_, c)) = parents.get_index(index).unwrap();
             if success(node) {
                 let path = reverse_path(&parents, |&(p, _)| p, index);
-                return Some((path, cost));
+                return Ok((path, cost));
             }
             // We may have inserted a node several time into the binary heap if we found
             // a better way to access it. Ensure that we are currently dealing with the
@@ -140,9 +141,14 @@ where
                 cost: new_cost,
                 index: n,
             });
+            if h < fb.1 {
+                fb = ( n, h, new_cost );
+            }
         }
     }
-    None
+
+    let path = reverse_path(&parents, |&(p, _)| p, fb.0);
+    return Err((path, fb.2));
 }
 
 /// Compute all shortest paths using the [A* search
